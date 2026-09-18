@@ -1,0 +1,2 @@
+import {Router} from "express"; import {prisma} from "../config/database"; const r=Router();
+r.get("/rankings",async(req,res)=>{const year=Number(req.query.year||new Date().getFullYear());const data=await prisma.municipalityScore.findMany({where:{year},include:{municipality:{include:{district:{include:{province:true}}}}},orderBy:{overallScore:"desc"}});res.json({success:true,year,data})}); export default r;

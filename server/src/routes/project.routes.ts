@@ -1,0 +1,2 @@
+import {Router} from "express"; import {prisma} from "../config/database"; const r=Router();
+r.get("/",async(req,res)=>{const municipalityId=req.query.municipalityId?Number(req.query.municipalityId):undefined;const data=await prisma.project.findMany({where:municipalityId?{municipalityId}:undefined,include:{municipality:true,ward:true,updates:true},orderBy:{createdAt:"desc"}});res.json({success:true,data})}); export default r;
