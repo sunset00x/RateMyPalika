@@ -1,4 +1,30 @@
-import {Router} from "express"; import {prisma} from "../config/database"; const r=Router();
-r.get("/",async(_req,res)=>{const data=await prisma.municipality.findMany({include:{district:{include:{province:true}}},orderBy:{name:"asc"}});res.json({success:true,data})});
-r.get("/:id",async(req,res)=>{const data=await prisma.municipality.findUnique({where:{id:Number(req.params.id)},include:{district:{include:{province:true}},wards:true,scores:{orderBy:{year:"desc"}},projects:true,budgets:true,indicatorValues:{include:{indicator:{include:{category:true}},source:true}}}});if(!data)return res.status(404).json({success:false,message:"Municipality not found"});res.json({success:true,data})});
-export default r;
+import { Router, Request, Response, NextFunction } from "express";
+import prisma from "../config/db";
+
+const router = Router();
+
+// GET /municipalities - Return all municipalities for frontend components
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const municipalities = await prisma.municipality.findMany({
+      include: {
+        district: {
+          include: {
+            province: true,
+          },
+        },
+        scores: {
+          where: { year: 2025 },
+          take: 1,
+        },
+      },
+      orderBy: { id: "asc" },
+    });
+
+    res.json(municipalities);
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;
