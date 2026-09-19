@@ -1,38 +1,17 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 
-const app = express();
 const prisma = new PrismaClient();
+const app = express();
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-  })
-);
-
+app.use(cors());
 app.use(express.json());
 
-/*
-|--------------------------------------------------------------------------
-| HEALTH
-|--------------------------------------------------------------------------
-*/
-
-app.get("/health", (_req, res) => {
-  res.json({
-    success: true,
-    message: "RateMyPalika API is running",
-  });
-});
-
-/*
-|--------------------------------------------------------------------------
-| MUNICIPALITIES
-|--------------------------------------------------------------------------
-*/
-
-app.get("/municipalities", async (_req, res) => {
+// -----------------------------------------------------------------------------
+// 1. GET ALL MUNICIPALITIES (for Municipalities.tsx & Ranking.tsx)
+// -----------------------------------------------------------------------------
+app.get("/municipalities", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const municipalities = await prisma.municipality.findMany({
       include: {
@@ -42,232 +21,141 @@ app.get("/municipalities", async (_req, res) => {
           },
         },
         scores: {
-          orderBy: {
-            year: "desc",
-          },
+          orderBy: { year: "desc" },
           take: 1,
         },
+        wards: true,
       },
-      orderBy: {
-        name: "asc",
-      },
+      orderBy: { id: "asc" },
     });
 
     res.json(municipalities);
   } catch (error) {
-    console.error("GET /municipalities error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to load municipalities",
-    });
+    next(error);
   }
 });
 
-/*
-|--------------------------------------------------------------------------
-| SINGLE MUNICIPALITY
-|--------------------------------------------------------------------------
-*/
-
-app.get("/municipalities/:id", async (req, res) => {
+// -----------------------------------------------------------------------------
+// 2. GET SINGLE MUNICIPALITY BY ID (for Detail View)
+// -----------------------------------------------------------------------------
+app.get("/municipalities/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const id = Number(req.params.id);
-
-    if (Number.isNaN(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid municipality ID",
-      });
-    }
-
+    const { id } = req.params;
     const municipality = await prisma.municipality.findUnique({
-      where: {
-        id,
-      },
+      where: { id: Number(id) },
       include: {
         district: {
           include: {
             province: true,
           },
         },
-        wards: true,
         scores: {
-          orderBy: {
-            year: "desc",
-          },
+          orderBy: { year: "desc" },
         },
-        budgets: {
-          orderBy: {
-            year: "desc",
-          },
-        },
-        projects: {
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        reports: {
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
+        wards: true,
+        projects: true,
+        budgets: true,
+        citizenReports: true,
       },
     });
 
     if (!municipality) {
-      return res.status(404).json({
-        success: false,
-        message: "Municipality not found",
-      });
+      return res.status(404).json({ error: "Municipality not found" });
     }
 
     res.json(municipality);
   } catch (error) {
-    console.error("GET /municipalities/:id error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to load municipality",
-    });
+    next(error);
   }
 });
 
-/*
-|--------------------------------------------------------------------------
-| RANKINGS
-|--------------------------------------------------------------------------
-*/
-
-app.get("/rankings", async (req, res) => {
+// -----------------------------------------------------------------------------
+// 3. SCORES ENDPOINTS (uses prisma.score in lowercase)
+// -----------------------------------------------------------------------------
+app.get("/scores", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const year = req.query.year
-      ? Number(req.query.year)
-      : undefined;
-
-    const rankings = await prisma.municipalityScore.findMany({
-      where: year
-        ? {
-            year,
-          }
-        : undefined,
+    const scores = await prisma.score.findMany({
       include: {
-        municipality: {
-          include: {
-            district: {
-              include: {
-                province: true,
-              },
-            },
-          },
-        },
+        municipality: true,
       },
-      orderBy: {
-        overallScore: "desc",
-      },
+      orderBy: { year: "desc" },
     });
-
-    res.json(rankings);
+    res.json(scores);
   } catch (error) {
-    console.error("GET /rankings error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to load rankings",
-    });
+    next(error);
   }
 });
 
-/*
-|--------------------------------------------------------------------------
-| DATABASE STATISTICS
-|--------------------------------------------------------------------------
-*/
-
-app.get("/stats", async (_req, res) => {
+app.post("/scores", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const [
-      provinces,
-      districts,
-      municipalities,
-      wards,
-      projects,
-      budgets,
-      reports,
-    ] = await Promise.all([
-      prisma.province.count(),
-      prisma.district.count(),
-      prisma.municipality.count(),
-      prisma.ward.count(),
-      prisma.project.count(),
-      prisma.budget.count(),
-      prisma.citizenReport.count(),
-    ]);
-
-    res.json({
-      provinces,
-      districts,
-      municipalities,
-      wards,
-      projects,
-      budgets,
-      reports,
+    const { overallScore, year, municipalityId } = req.body;
+    const newScore = await prisma.score.create({
+      data: {
+        overallScore: Number(overallScore),
+        year: Number(year),
+        municipalityId: Number(municipalityId),
+      },
     });
+    res.status(201).json(newScore);
   } catch (error) {
-    console.error("GET /stats error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to load statistics",
-    });
+    next(error);
   }
 });
 
-/*
-|--------------------------------------------------------------------------
-| 404
-|--------------------------------------------------------------------------
-*/
+// -----------------------------------------------------------------------------
+// 4. AUXILIARY ENTITY ROUTE HANDLERS
+// -----------------------------------------------------------------------------
 
-app.use((_req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-  });
+// Wards Handler
+app.get("/wards", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const wards = await prisma.ward.findMany();
+    res.json(wards);
+  } catch (error) {
+    next(error);
+  }
 });
 
-/*
-|--------------------------------------------------------------------------
-| ERROR HANDLER
-|--------------------------------------------------------------------------
-*/
-
-app.use(
-  (
-    error: unknown,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    console.error("Unhandled server error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+// Projects Handler
+app.get("/projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const projects = await prisma.project.findMany();
+    res.json(projects);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
-/*
-|--------------------------------------------------------------------------
-| START SERVER
-|--------------------------------------------------------------------------
-*/
+// Budgets Handler
+app.get("/budgets", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const budgets = await prisma.budget.findMany();
+    res.json(budgets);
+  } catch (error) {
+    next(error);
+  }
+});
 
-const PORT = Number(process.env.PORT) || 5000;
+// Citizen Reports Handler
+app.get("/citizen-reports", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const reports = await prisma.citizenReport.findMany();
+    res.json(reports);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GLOBAL ERROR MIDDLEWARE & SERVER INITIALIZATION
+// -----------------------------------------------------------------------------
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error("Internal Server Error:", err.message);
+  res.status(500).json({ error: "Internal Server Error", details: err.message });
+});
+
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(
-    `ratemypalika API running on http://localhost:${PORT}`
-  );
+  console.log(`RateMyPalika backend running on http://localhost:${PORT}`);
 });
