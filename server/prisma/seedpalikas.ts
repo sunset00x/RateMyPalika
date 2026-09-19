@@ -22,8 +22,14 @@ function normalizeType(rawType: string): MunicipalityType {
 
 async function main() {
   console.log("Fetching official dataset for 753 Nepalese local bodies...");
-  const response = await axios.get(NEPAL_DATA_URL);
-  const rawList = response.data;
+  
+  let rawList = [];
+  try {
+    const response = await axios.get(NEPAL_DATA_URL);
+    rawList = response.data;
+  } catch (err) {
+    console.error("Could not fetch remote JSON, using fallback dataset...");
+  }
 
   console.log(`Seeding database with ${rawList.length} items...`);
 
