@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Or "sqlite" / "mysql"
+  provider = "postgresql" // or "sqlite" / "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,19 +29,54 @@ model District {
 }
 
 model Municipality {
-  id         Int              @id @default(autoincrement())
-  name       String
-  type       MunicipalityType
-  population Int?
-  districtId Int
-  district   District         @relation(fields: [districtId], references: [id])
-  scores     Score[]
+  id             Int                 @id @default(autoincrement())
+  name           String
+  type           MunicipalityType
+  population     Int?
+  districtId     Int
+  district       District            @relation(fields: [districtId], references: [id])
+  scores         Score[]
+  wards          Ward[]
+  projects       Project[]
+  budgets        Budget[]
+  citizenReports CitizenReport[]
 }
 
 model Score {
   id             Int          @id @default(autoincrement())
   overallScore   Float
   year           Int
+  municipalityId Int
+  municipality   Municipality @relation(fields: [municipalityId], references: [id])
+}
+
+model Ward {
+  id             Int          @id @default(autoincrement())
+  wardNumber     Int
+  municipalityId Int
+  municipality   Municipality @relation(fields: [municipalityId], references: [id])
+}
+
+model Project {
+  id             Int          @id @default(autoincrement())
+  title          String
+  status         String
+  municipalityId Int
+  municipality   Municipality @relation(fields: [municipalityId], references: [id])
+}
+
+model Budget {
+  id             Int          @id @default(autoincrement())
+  fiscalYear     String
+  amount         Float
+  municipalityId Int
+  municipality   Municipality @relation(fields: [municipalityId], references: [id])
+}
+
+model CitizenReport {
+  id             Int          @id @default(autoincrement())
+  title          String
+  status         String
   municipalityId Int
   municipality   Municipality @relation(fields: [municipalityId], references: [id])
 }
