@@ -3,15 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" // Or "sqlite" / "mysql"
   url      = env("DATABASE_URL")
-}
-
-enum UserRole {
-  CITIZEN
-  VERIFIER
-  MUNICIPALITY_ADMIN
-  SUPER_ADMIN
 }
 
 enum MunicipalityType {
@@ -21,265 +14,34 @@ enum MunicipalityType {
   RURAL_MUNICIPALITY
 }
 
-enum ReportStatus {
-  SUBMITTED
-  UNDER_REVIEW
-  VERIFIED
-  REJECTED
-  ASSIGNED
-  IN_PROGRESS
-  RESOLVED
-}
-
-enum ProjectStatus {
-  PLANNED
-  IN_PROGRESS
-  COMPLETED
-  DELAYED
-  CANCELLED
-}
-
-model User {
-  id             Int      @id @default(autoincrement())
-  name           String
-  email          String   @unique
-  password       String
-  role           UserRole @default(CITIZEN)
-  municipalityId Int?
-
-  municipality  Municipality?   @relation(fields: [municipalityId], references: [id])
-  reports       CitizenReport[]
-  verifications Verification[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model Province {
-  id   Int    @id @default(autoincrement())
-  name String @unique
-
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
   districts District[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model District {
-  id         Int    @id @default(autoincrement())
-  name       String
-  provinceId Int
-
+  id             Int            @id @default(autoincrement())
+  name           String
+  provinceId     Int
   province       Province       @relation(fields: [provinceId], references: [id])
   municipalities Municipality[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([name, provinceId])
 }
 
 model Municipality {
   id         Int              @id @default(autoincrement())
   name       String
   type       MunicipalityType
-  districtId Int
   population Int?
-
-  district        District            @relation(fields: [districtId], references: [id])
-  wards           Ward[]
-  users           User[]
-  projects        Project[]
-  reports         CitizenReport[]
-  budgets         Budget[]
-  scores          MunicipalityScore[]
-  indicatorValues IndicatorValue[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([name, districtId])
+  districtId Int
+  district   District         @relation(fields: [districtId], references: [id])
+  scores     Score[]
 }
 
-model Ward {
-  id             Int @id @default(autoincrement())
-  wardNumber     Int
-  municipalityId Int
-
-  municipality Municipality    @relation(fields: [municipalityId], references: [id])
-  reports      CitizenReport[]
-  projects     Project[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([wardNumber, municipalityId])
-}
-
-model IndicatorCategory {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  description String?
-  weight      Float
-
-  indicators Indicator[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Indicator {
-  id          Int     @id @default(autoincrement())
-  name        String
-  description String?
-  categoryId  Int
-
-  category IndicatorCategory @relation(fields: [categoryId], references: [id])
-  values   IndicatorValue[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model IndicatorValue {
-  id             Int   @id @default(autoincrement())
-  municipalityId Int
-  indicatorId    Int
-  year           Int
-  value          Float
-  score          Float
-  sourceId       Int?
-
-  municipality Municipality @relation(fields: [municipalityId], references: [id])
-  indicator    Indicator    @relation(fields: [indicatorId], references: [id])
-  source       DataSource?  @relation(fields: [sourceId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([municipalityId, indicatorId, year])
-}
-
-model MunicipalityScore {
-  id             Int   @id @default(autoincrement())
-  municipalityId Int
-  year           Int
+model Score {
+  id             Int          @id @default(autoincrement())
   overallScore   Float
-
-  municipality Municipality @relation(fields: [municipalityId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([municipalityId, year])
-}
-
-model DataSource {
-  id          Int     @id @default(autoincrement())
-  name        String
-  url         String?
-  description String?
-
-  indicatorValues IndicatorValue[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Project {
-  id             Int           @id @default(autoincrement())
-  name           String
-  description    String?
-  municipalityId Int
-  wardId         Int?
-  budget         Float
-  progress       Float         @default(0)
-  status         ProjectStatus @default(PLANNED)
-
-  startDate   DateTime?
-  expectedEnd DateTime?
-  actualEnd   DateTime?
-
-  municipality Municipality    @relation(fields: [municipalityId], references: [id])
-  ward         Ward?           @relation(fields: [wardId], references: [id])
-  updates      ProjectUpdate[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ProjectUpdate {
-  id        Int     @id @default(autoincrement())
-  projectId Int
-  progress  Float
-  note      String?
-
-  project Project @relation(fields: [projectId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-model Budget {
-  id             Int   @id @default(autoincrement())
-  municipalityId Int
   year           Int
-  allocated      Float
-  spent          Float
-
-  municipality Municipality @relation(fields: [municipalityId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([municipalityId, year])
-}
-
-model CitizenReport {
-  id             Int  @id @default(autoincrement())
-  userId         Int
   municipalityId Int
-  wardId         Int?
-
-  category    String
-  title       String
-  description String
-
-  latitude  Float?
-  longitude Float?
-
-  status ReportStatus @default(SUBMITTED)
-
-  user         User         @relation(fields: [userId], references: [id])
-  municipality Municipality @relation(fields: [municipalityId], references: [id])
-  ward         Ward?        @relation(fields: [wardId], references: [id])
-
-  evidence      Evidence[]
-  verifications Verification[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Evidence {
-  id       Int    @id @default(autoincrement())
-  reportId Int
-  url      String
-  type     String
-
-  report CitizenReport @relation(fields: [reportId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-model Verification {
-  id       Int     @id @default(autoincrement())
-  reportId Int
-  userId   Int
-  approved Boolean
-  note     String?
-
-  report CitizenReport @relation(fields: [reportId], references: [id])
-  user   User          @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
+  municipality   Municipality @relation(fields: [municipalityId], references: [id])
 }
