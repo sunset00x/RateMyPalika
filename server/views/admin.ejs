@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RateMyPalika - Express Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased">
+  <header class="bg-slate-900 text-white py-4 px-6 shadow-md flex justify-between items-center">
+    <div>
+      <h1 className="text-xl font-bold">RateMyPalika Server Admin Dashboard</h1>
+      <p class="text-xs text-slate-400">Backend Control Panel & Rename Approval System</p>
+    </div>
+    <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 rounded-full font-semibold">
+      Server Active (Port 5000)
+    </span>
+  </header>
+
+  <main class="max-w-6xl mx-auto p-6 space-y-8">
+    
+    <!-- 1. Pending Proposals Queue -->
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h2 class="text-lg font-bold text-slate-900 mb-1">Pending Citizen Rename Proposals</h2>
+      <p class="text-xs text-slate-500 mb-4">Review name updates proposed by users and accept or reject them.</p>
+
+      <% if (requests.length === 0) { %>
+        <div class="text-center py-8 border border-dashed rounded-lg text-slate-400 text-sm">
+          No pending rename requests in queue.
+        </div>
+      <% } else { %>
+        <div class="space-y-3">
+          <% requests.forEach(function(req) { %>
+            <div class="p-4 border border-slate-200 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50">
+              <div>
+                <div class="text-xs text-slate-400 font-mono mb-1">Request #<%= req.id %> · Palika #<%= req.palikaId %></div>
+                <div class="text-sm font-bold">
+                  <span class="line-through text-slate-400"><%= req.municipality ? req.municipality.name : 'Unknown' %></span>
+                  <span class="mx-2 text-blue-600">→</span>
+                  <span class="text-emerald-600 font-extrabold"><%= req.proposedName %></span>
+                </div>
+                <p class="text-xs text-slate-600 mt-1"><strong>Reason:</strong> <%= req.reason %></p>
+                <div class="text-[11px] text-slate-400 mt-1">By: <%= req.user ? req.user.email : 'Citizen' %></div>
+              </div>
+
+              <div class="flex gap-2">
+                <form action="/admin/requests/<%= req.id %>/approve" method="POST">
+                  <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold">
+                    ✓ Accept & Update
+                  </button>
+                </form>
+                <form action="/admin/requests/<%= req.id %>/reject" method="POST">
+                  <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold">
+                    ✕ Reject
+                  </button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+
+    <!-- 2. All Municipalities Table -->
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h2 class="text-lg font-bold text-slate-900 mb-4">All Registered Municipalities (<%= municipalities.length %>)</h2>
+
+      <div class="overflow-x-auto max-h-[500px] overflow-y-auto border border-slate-200 rounded-lg">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-slate-100 text-slate-600 text-xs uppercase sticky top-0">
+            <tr>
+              <th class="p-3">ID</th>
+              <th class="p-3">Current Name</th>
+              <th class="p-3">Type</th>
+              <th class="p-3">District</th>
+              <th class="p-3 text-right">Quick Direct Rename</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <% municipalities.forEach(function(m) { %>
+              <tr class="hover:bg-slate-50">
+                <td class="p-3 font-mono text-xs text-slate-400">#<%= m.id %></td>
+                <td class="p-3 font-bold text-slate-900"><%= m.name %></td>
+                <td class="p-3 text-xs font-semibold text-blue-600"><%= m.type %></td>
+                <td class="p-3 text-slate-500"><%= m.district ? m.district.name : 'N/A' %></td>
+                <td class="p-3 text-right">
+                  <form action="/admin/municipalities/<%= m.id %>/rename" method="POST" class="flex justify-end gap-2">
+                    <input type="text" name="name" placeholder="Enter Real Name" required class="border text-xs px-2 py-1 rounded w-48 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1 rounded font-semibold">
+                      Save Name
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
